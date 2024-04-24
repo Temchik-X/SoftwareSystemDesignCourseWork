@@ -1,0 +1,247 @@
+﻿@page "/performance_evaluation"
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+@using Microsoft.AspNetCore.Authorization
+@inject AuthenticationService authService
+@inject NavigationManager navigationManager
+@inject HttpClient Http
+@using Microsoft.JSInterop
+@using Xceed.Document.NET;
+@using Xceed.Words.NET;
+
+@attribute [Authorize]
+
+<style>
+       
+        section {
+            padding: 20px;
+        }
+        li {
+            margin-bottom: 5px;
+            margin-top: 5px;
+        }
+        li span {
+            margin-right: 5px;
+        }
+        .overlay {
+            display: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+
+        #div1 {
+            background-color: #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        #div2 {
+            background-color: #eee;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        #goalSettingModal {
+            background-color: #ccc;
+            padding: 10px;
+        }
+    </style>
+
+@if (isAuthenticated && role != "User")
+{
+    <AddDepartmentGoalDialog @ref="addDepartmentGoalDialog" RefreshGoals="RefreshGoals"/>
+    <section>
+        <div id="div1">
+            <h2>Оценка эффективности</h2>
+            <div id="goalList">
+            @if (departmentGoals != null)
+            {
+                    <Button Color="ButtonColor.Secondary" Size="Size.Small"@onclick="OpenAddGoalModal">Добавить цель</Button>
+                <ul>
+                    @foreach (var goal in departmentGoals)
+                    {
+                        <li><span>@goal.name</span><Button Color="ButtonColor.Secondary" Size="Size.Small"   @onclick="() => DeleteGoal(goal.id)">Удалить</Button></li>  
+                    }
+                 </ul>
+                     
+            }
+            else
+            {
+                <a>Загрузка...</a>
+            }
+            </div>
+        </div>
+        <div id="div2">
+            <Button Color="ButtonColor.Secondary" Size="Size.Small" @ref="saveButton1"  @onclick="GeneratePerformanceReport">Добавить цель</Button>
+            <button @onclick="GeneratePerformanceReport">Сформировать отчет</button>
+            <div id="performanceReport">
+            @foreach (var mark in employeeMarks)
+            {
+                    <a style="margin-top:4px">Сотрудник @mark.employee.name: Оценка -</a> <input style="max-width:50px;margin-top:4px" type="text" @bind="mark.mark"/>
+                    <br/>
+            }
+
+            </div>
+        </div>
+    </section>
+}
+else if (!isLoad)
+{
+        <section>
+        <div class="d-flex justify-content-center">
+            <strong role="status">Загрузка...</strong>
+            <Spinner Type="SpinnerType.Border" Class="ms-auto" />
+        </div>
+        </section>
+}
+else
+{
+        <section>
+            <h2>Ошибка 403. Доступ только для авторизованных пользователей</h2>
+        @if (role == null)
+        {
+                    <h3>Возврат на страницу авторизации через: @timer</h3>
+        }
+        </section>
+}
+@code {
+    private bool isAuthenticated;
+    private Button saveButton1 = default!;
+    private bool isLoad = false;
+    private string role;
+    [Inject]
+    protected IJSRuntime JSRuntime { get; set; }
+    private AddDepartmentGoalDialog addDepartmentGoalDialog;
+    private int timer = 15;
+
+    private List<DepartmentGoal>? departmentGoals;
+    private List<Employee> employees;
+    private List<EmployeeMark> employeeMarks = new List<EmployeeMark>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await authService.IsAuthenticated();
+        if (!isAuthenticated)
+        {
+            isLoad = true;
+            for (timer = 15; timer > 0; timer--)
+            {
+                await Task.Delay(1000);
+                StateHasChanged();
+            }
+            navigationManager.NavigateTo("/");
+        }
+        else
+        {
+            role = await authService.GetRole();
+            try
+            {
+                departmentGoals = await Http.GetFromJsonAsync<List<DepartmentGoal>>("api/DepartmentGoal");
+                employees = await Http.GetFromJsonAsync<List<Employee>>("api/Employee");
+                SetMarkList();
+                isLoad = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                // Или другие действия по логированию ошибки
+            }
+        }
+    }
+    private void SetMarkList()
+    {
+        foreach (var emp in employees)
+        {
+            // Создание нового объекта EmployeeMark и присвоение ему соответствующего сотрудника и оценки
+            var employeeMark = new EmployeeMark
+                {
+                    employee = emp,
+                    mark = 0.0 // Пример оценки, можете задать нужное значение
+                };
+
+            // Добавление объекта EmployeeMark в список
+            employeeMarks.Add(employeeMark);
+        }
+    }
+    private async Task OpenAddGoalModal()
+    {
+        await addDepartmentGoalDialog.modal.ShowAsync();
+    }
+    private async Task RefreshGoals()
+    {
+        try
+        {
+            departmentGoals = await Http.GetFromJsonAsync<List<DepartmentGoal>>("api/DepartmentGoal");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+            // Или другие действия по логированию ошибки
+        }
+    }
+    private async Task DeleteGoal(int id)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/DepartmentGoal/{id}");
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+
+            await RefreshGoals(); // Вызываем метод обновления данных
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+    public async Task<byte[]> GenerateReport()
+    {
+        using (MemoryStream stream = new MemoryStream())
+        {
+            using (DocX document = DocX.Create(stream))
+            {
+                Paragraph title = document.InsertParagraph("Отчет по сотрудникам");
+                title.FontSize(20);
+                title.Bold();
+                title.Alignment = Xceed.Document.NET.Alignment.center;
+
+                // Добавление таблицы с данными о сотрудниках и оценками
+                Table table = document.AddTable(employeeMarks.Count + 1, 3);
+                table.Design = TableDesign.LightGrid;
+                table.AutoFit = AutoFit.Window;
+                table.Rows[0].Cells[0].Paragraphs.First().Append("Имя сотрудника");
+                table.Rows[0].Cells[1].Paragraphs.First().Append("Должность");
+                table.Rows[0].Cells[2].Paragraphs.First().Append("Оценка");
+
+                for (int i = 0; i < employeeMarks.Count; i++)
+                {
+                    table.Rows[i + 1].Cells[0].Paragraphs.First().Append(employeeMarks[i].employee.name);
+                    table.Rows[i + 1].Cells[1].Paragraphs.First().Append(employeeMarks[i].employee.jobtitle);
+                    table.Rows[i + 1].Cells[2].Paragraphs.First().Append(employeeMarks[i].mark.ToString());
+                }
+
+                document.InsertTable(table);
+
+                // Сохранение документа
+                document.Save();
+            }
+
+            // Преобразование MemoryStream в массив байтов и возврат
+            return await Task.Run(() => stream.ToArray());
+        }
+    }
+    private async Task GeneratePerformanceReport()
+    {
+        saveButton1.ShowLoading("Loading...");
+        await Task.Delay(100); // API call
+        byte[] content = await GenerateReport();
+        await JSRuntime.InvokeVoidAsync("saveAsFile", "Otchet_po_effectivnosty.docx", Convert.ToBase64String(content));
+        saveButton1.HideLoading();
+    }
+}

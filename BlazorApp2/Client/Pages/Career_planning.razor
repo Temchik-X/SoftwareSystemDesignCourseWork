@@ -1,0 +1,269 @@
+﻿@page "/career_planning"
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Headers;
+@inject AuthenticationService authService
+@inject NavigationManager navigationManager
+@inject HttpClient Http
+@attribute [Authorize]
+
+<style>
+        section {
+            padding: 20px;
+        }
+
+        #employeeList {
+            background-color: #ccc;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        #employeeProfile {
+            background-color: #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        #careerPlan {
+            background-color: #eee;
+            padding: 20px;
+        }
+        li {
+            margin-bottom: 5px;
+            margin-top: 5px;
+        }
+
+        li span {
+            margin-right: 5px;
+        }
+
+        /* Modal styles 
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            z-index: 1;
+        }
+
+        .modal input, .modal textarea {
+            margin-bottom: 10px;
+            width: 100%;
+        }*/
+
+        .overlay {
+            display: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+    </style>
+@if (isAuthenticated)
+{
+    <AddIndividualGoalDialog @ref="addIndividualGoalDialog" RefreshGoals="RefreshGoals"/>
+    <section>
+        <div id="employeeList">
+            <!-- Выбор сотрудника -->
+            @if (role != "User")
+            {
+                <label for="employeeSelect">Выберите сотрудника:</label>
+                @if (employees != null)
+                {
+                    <select style="margin-left:5px" id="employeeSelect"  @onchange="LoadEmployeeData">
+                        <option value="0">Выберите...</option>
+                        @foreach (var employee in employees)
+                        {
+                            <option value="@employee.id">@employee.name</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <a>Загрузка...</a>
+                }
+
+            }
+            else
+            {
+                <label for="employeeSelect">Профиль сотрудника:</label>
+                    @if(selectedEmployee != null)
+                    {
+                        <select style="margin-left:5px" id="employeeSelect"  @onchange="LoadEmployeeData">
+                            <option value="@selectedEmployee.id">@selectedEmployee.name</option>
+                        </select>
+                    }
+                    else
+                    {
+                        <a>Нет сотрудника для пользователя</a>    
+                    }
+                
+            }
+        </div>
+
+
+        <div id="employeeProfile">
+            <h2>Профиль сотрудника</h2>
+            @if (selectedEmployee != null)
+            {
+                <p><strong>Имя:</strong> @selectedEmployee?.name</p>
+                <p><strong>Должность:</strong> @selectedEmployee?.jobtitle</p>
+                <p><strong>Компетенции:</strong> @selectedEmployee?.competencies</p>
+            }
+            else
+            {
+                <p>Сотрудник не выбран...</p>
+            }
+
+        </div>
+        <div id="careerPlan">
+            <h2>План карьерного роста</h2>
+            @if (individualGoals == null)
+            {
+                <p>Сотрудник не выбран...</p>
+            }
+            else if (individualGoals.Count == 0)
+            {
+                <Button Color="ButtonColor.Secondary" Size="Size.Small" @onclick="OpenAddGoalModal">Добавить цель</Button>
+                <p>Нет курсов</p>
+            }
+            else
+            {
+                <Button Color="ButtonColor.Secondary" Size="Size.Small" @onclick="OpenAddGoalModal">Добавить цель</Button>
+                <ul id="goalList">
+                    @foreach (var indGoal in individualGoals)
+                    {
+                        <li><span>@indGoal.course_name</span><Button Color="ButtonColor.Secondary" Size="Size.Small"  @onclick="() => DeleteGoal(indGoal.id)">Удалить</Button></li>
+                    }   
+                </ul>
+            }
+        </div>
+    </section>
+}
+else if (!isLoad)
+{
+            <section>
+            <div class="d-flex justify-content-center">
+                <strong role="status">Загрузка...</strong>
+                <Spinner Type="SpinnerType.Border" Class="ms-auto" />
+            </div>
+            </section>
+}
+else
+{
+        <section>
+                <h2>Ошибка 403. Доступ только для авторизованных пользователей</h2>
+                <h3>Возврат на страницу авторизации через: @timer</h3>
+        </section>
+}
+@code {
+    private AddIndividualGoalDialog addIndividualGoalDialog;
+    private bool isAuthenticated;
+    private bool isLoad = false;
+    private int timer = 15;
+    private string role;
+
+    private List<Employee>? employees;
+    private List<User>? users;
+    private int userId;
+    private int? employeeId;
+    private User user;
+    private Employee selectedEmployee;
+    private List<IndividualGoal>? individualGoals;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await authService.IsAuthenticated();
+        if (!isAuthenticated)
+        {
+            isLoad = true;
+            for (timer = 15; timer > 0; timer--)
+            {
+                await Task.Delay(1000);
+                StateHasChanged();
+            }
+            navigationManager.NavigateTo("/");
+        }
+        else
+        {
+            role = await authService.GetRole();
+            userId = await authService.GetId();
+            try
+            {
+                string token = await authService.GetToken();
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                employees = await Http.GetFromJsonAsync<List<Employee>>("api/Employee");
+                users = await Http.GetFromJsonAsync<List<User>>("api/User");
+                user = users.FirstOrDefault(u => u.UserId == userId);
+                if (user!=null)
+                    employeeId = user.EmployeeId;
+                selectedEmployee = employees.FirstOrDefault(emp => emp.id == employeeId);
+                if(role == "User")
+                    individualGoals = await Http.GetFromJsonAsync<List<IndividualGoal>>($"api/IndividualGoal/{selectedEmployee.id}");
+                isLoad = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                // Или другие действия по логированию ошибки
+            }
+        }
+        
+    }
+    private async Task RefreshGoals()
+    {
+        try
+        {
+            individualGoals = await Http.GetFromJsonAsync<List<IndividualGoal>>($"api/IndividualGoal/{selectedEmployee.id}");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+            // Или другие действия по логированию ошибки
+        }
+    }
+    private async Task LoadEmployeeData(ChangeEventArgs e)
+    {
+        int selectedEmployeeId = int.Parse(e.Value.ToString());
+        if (selectedEmployeeId != 0)
+        {
+            selectedEmployee = employees.FirstOrDefault(emp => emp.id == selectedEmployeeId);
+            individualGoals = await Http.GetFromJsonAsync<List<IndividualGoal>>($"api/IndividualGoal/{selectedEmployeeId}");
+        }
+        else
+        {
+            selectedEmployee = null;
+            individualGoals = null;
+        }
+
+    }
+    private async Task OpenAddGoalModal()
+    {
+        addIndividualGoalDialog.EmployeeId = selectedEmployee.id;
+        await addIndividualGoalDialog.modal.ShowAsync();
+    }
+    private async Task DeleteGoal(int id)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/IndividualGoal/{id}");
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+
+            await RefreshGoals(); // Вызываем метод обновления данных
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+}

@@ -1,0 +1,198 @@
+﻿@page "/training_and_development"
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Headers;
+@inject AuthenticationService authService
+@inject NavigationManager navigationManager
+@inject HttpClient Http
+@attribute [Authorize]
+<style>
+        
+
+        section {
+            padding: 20px;
+        }
+
+        #trainingCatalog {
+            background-color: #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        #progressTracking {
+            background-color: #eee;
+            padding: 20px;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+        #trainingCatalog ul button.edit {
+            margin-left: 10px;
+        }
+        /* Обычное состояние ссылки */
+        .editLink {
+        color: #007bff; /* Цвет текста ссылки */
+        text-decoration: none; /* Убираем подчеркивание */
+        }
+
+        /* Состояние при наведении на ссылку */
+        .editLink:hover {
+        text-decoration: underline; /* Подчеркиваем ссылку при наведении */
+        cursor: pointer; /* Изменяем курсор на указывающую руку */
+        }
+
+        /* Состояние активной ссылки (нажатие) */
+        .editLink:active {
+        color: #0056b3; /* Цвет текста при нажатии */
+        }
+    </style>
+@if (isAuthenticated)
+{
+    <AddCourseDialog @ref="addCourseDialog"  RefreshCourses="RefreshCourses"/>
+    <EditCourseDialog @ref="editCourseDialog"  RefreshCourses="RefreshCourses"/>
+    <section>
+        <div id="trainingCatalog">
+            <h2>Каталог обучения</h2>
+            @if (courses != null)
+            {
+            <Button Color="ButtonColor.Secondary" Size="Size.Small"@onclick="ShowAddCourseDialog" >Записаться на курс</Button>
+                <ul>
+                    @foreach (var course in courses)
+                    {
+                        <li><span  class="editLink" @onclick="() => ShowEditCourseDialog(course)">@course.course_name</span>
+                            <Button Color="ButtonColor.Secondary" Size="Size.Small" @onclick="() => DeleteCourse(course.id)">Удалить</Button></li>  
+                    }
+                </ul>
+
+            }
+            else
+            {
+                        <a>Загрузка...</a>
+            }
+        </div>
+        <div id="progressTracking">
+            <h2>Отслеживание прогресса</h2>
+            @if (courses != null)
+            {
+                @foreach (var course in courses)
+                { 
+                    @if (course.is_finished)
+                    {
+                        <p><strong>Курс "@course.course_name": завершен</strong></p>
+                    }
+                    else
+                    {
+                        <p><strong>Курс "@course.course_name": в процессе</strong></p>
+                    }
+
+        }
+            }
+        </div>
+    </section>
+
+}
+else if (!isLoad)
+{
+            <section>
+            <div class="d-flex justify-content-center">
+                <strong role="status">Загрузка...</strong>
+                <Spinner Type="SpinnerType.Border" Class="ms-auto" />
+            </div>
+            </section>
+}
+else
+{
+        <section>
+                <h2>Ошибка 403. Доступ только для авторизованных пользователей</h2>
+                <h3>Возврат на страницу авторизации через: @timer</h3>
+        </section>
+}
+@code {
+    private bool isAuthenticated;
+    private bool isLoad = false;
+    private int userId;
+    private int timer = 15;
+    private List<Course>? courses;
+    private AddCourseDialog addCourseDialog;
+    private EditCourseDialog editCourseDialog;
+    Random rnd = new Random();
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await authService.IsAuthenticated();
+        if (!isAuthenticated)
+        {
+            isLoad = true;
+            for (timer = 15; timer > 0; timer--)
+            {
+                await Task.Delay(1000);
+                StateHasChanged();
+            }
+            navigationManager.NavigateTo("/");
+        }
+        else
+        {
+            userId = await authService.GetId();
+            try
+            {
+                string token = await authService.GetToken();
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                courses = await Http.GetFromJsonAsync<List<Course>>($"api/Course/{userId}");
+                isLoad = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                // Или другие действия по логированию ошибки
+            }
+        }
+    }
+    private async Task RefreshCourses()
+    {
+        try
+        {
+            courses = await Http.GetFromJsonAsync<List<Course>>($"api/Course/{userId}");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+            // Или другие действия по логированию ошибки
+        }
+    }
+    private async Task ShowAddCourseDialog()
+    {
+        addCourseDialog.userId = userId;
+        await addCourseDialog.modal.ShowAsync();
+    }
+    private async Task ShowEditCourseDialog(Course course)
+    {
+        editCourseDialog.course = course;
+        await editCourseDialog.modal.ShowAsync();
+    }
+    private async Task DeleteCourse(int id)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/Course/{id}");
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+
+            await RefreshCourses(); // Вызываем метод обновления данных
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}
+
+

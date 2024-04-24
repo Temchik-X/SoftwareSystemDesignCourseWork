@@ -1,0 +1,49 @@
+﻿@page "/login"
+@using BlazorApp2.Shared
+@inject AuthenticationService authService
+@inject NavigationManager navigationManager
+@inject IPageTitleService PageTitleService
+@using System.ComponentModel.DataAnnotations
+<div style="padding : 20px">
+    <h3>Вход</h3>
+    @if (errorMessage != null)
+    {
+                <p>@errorMessage</p>
+    }
+    <div style="padding-top : 5px">
+        <label for="username">Имя пользователя:</label>
+        <input id="username" @bind="loginInput.Username" />
+    </div>
+
+    <div style="padding-top : 5px">
+        <label for="password">Пароль:</label>
+        <input id="password" type="password" @bind="loginInput.Password" />
+    </div>
+
+    <Button Color="ButtonColor.Secondary" Size="Size.Small" style="padding-top : 5px" @onclick="Login">Войти</Button>
+</div>
+
+@code {
+    private LoginModel loginInput = new LoginModel();
+    private string errorMessage;
+    [Inject] protected PreloadService PreloadService { get; set; } = default!;
+
+    private async Task Login()
+    {
+        PreloadService.Show(SpinnerColor.Light, "Загрузка данных...");
+        try
+        {
+            // Выполняем аутентификацию
+            var token = await authService.LoginAsync(loginInput);
+            await PageTitleService.UpdatePageTitleAsync();
+            // Перенаправляем пользователя на защищенную страницу
+            navigationManager.NavigateTo("/main");
+        }
+        catch (Exception ex)
+        {
+            // Если возникла ошибка, выводим сообщение об ошибке
+            errorMessage = "Ошибка аутентификации: " + ex.Message;
+        }
+        PreloadService.Hide();
+    }
+}

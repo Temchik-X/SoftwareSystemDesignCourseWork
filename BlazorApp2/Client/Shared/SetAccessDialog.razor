@@ -1,0 +1,82 @@
+﻿@inject HttpClient Http
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+<Modal @ref="modal" OnHiding="OnModalHiding" Title="Настройка доступа">
+    <BodyTemplate>
+       <h3>Выберите пользователя</h3>
+       <div style="margin-top:5px">
+            <label for="usersSelect">Выберите сотрудника:</label>
+            @if (users != null)
+            {
+                <select style="margin-left:5px" id="usersSelect" @onchange="LoadUserData" required>
+                <option value="0">Выберите...</option>
+                    @foreach (var user in users)
+                    {
+                        <option value="@user.UserId">@user.Username</option>
+                    }
+                        </select>
+            }
+        </div>
+        @if (userRole != null)
+        {
+            <div style="margin-top:5px">
+                <label for="password">Роль:</label>
+                    <select style="margin-left:5px" id="role" name="role" @bind="@userRole" required>
+                        <option value="User">Сотрудник</option>
+                        <option value="Admin">Администратор</option>
+                        <option value="Manager">Менеджер</option>
+                </select>
+            </div>
+        }
+
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Secondary"  @onclick="OnHideAddGoalModal">Отмена</Button>
+        <Button Color="ButtonColor.Secondary" Outline="true" @onclick="UpdateUser">Изменить</Button>
+    </FooterTemplate>
+</Modal>
+@code {
+    public Modal modal = default!;
+    [Parameter]
+    public List<User> users { get; set; }
+    private User selectedUser;
+    private string userRole;
+    private void LoadUserData(ChangeEventArgs e)
+    {
+        int selectedUserId = int.Parse(e.Value.ToString());
+        if (selectedUserId != 0)
+        {
+            selectedUser = users.FirstOrDefault(user => user.UserId == selectedUserId);
+            userRole = selectedUser.Role;
+            //individualGoals = await Http.GetFromJsonAsync<List<IndividualGoal>>($"api/IndividualGoal/{selectedEmployeeId}");
+        }
+    }
+    private async Task UpdateUser()
+    {
+        selectedUser.Role = userRole;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/User/{selectedUser.UserId}", selectedUser);
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+
+            // Если запрос успешен, закрываем диалоговое окно
+            await modal.HideAsync();
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Ошибка при обновлении сотрудника: {ex.Message}");
+        }
+    }
+    private void OnModalHiding()
+    {
+        selectedUser = null;
+        userRole = null;
+    }
+
+    private async Task OnHideAddGoalModal()
+    {
+        await modal.HideAsync();
+    }
+
+}

@@ -1,0 +1,73 @@
+﻿@page "/register"
+@using BlazorApp2.Shared
+@inject HttpClient httpClient
+@inject NavigationManager navigationManager
+@using Microsoft.JSInterop
+
+<h3>Регистрация</h3>
+
+@if (errorMessage != null)
+{
+        <p>@errorMessage</p>
+}
+
+<EditForm Model="@registerModel" OnValidSubmit="@Register">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label for="username">Имя пользователя:</label>
+        <InputText id="username" @bind-Value="@registerModel.Username" />
+    </div>
+
+    <div>
+        <label for="password">Пароль:</label>
+        <InputText id="password" type="password" @bind-Value="@registerModel.Password" />
+
+    </div>
+    <div>
+        <label for="role">Роль:</label>
+        <InputText id="role" type="role" @bind-Value="@registerModel.Role" />
+
+    </div>
+
+    <button type="submit">Зарегистрироваться</button>
+</EditForm>
+<button @onclick="DownloadFile">Скачать документ</button>
+
+@code {
+    private RegisterModel registerModel = new RegisterModel();
+    private string errorMessage;
+
+    private async Task Register()
+    {
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync("api/Authentication/register", registerModel);
+            response.EnsureSuccessStatusCode();
+            navigationManager.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Ошибка регистрации: " + ex.Message;
+        }
+    }
+    [Inject]
+    protected IJSRuntime JSRuntime { get; set; }
+    private async Task DownloadFile()
+    {
+        var fileName = "example.docx"; // Укажите имя файла, который нужно скачать
+        var response = await httpClient.GetAsync($"api/Documents/{fileName}");
+
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsByteArrayAsync();
+            await JSRuntime.InvokeVoidAsync("saveAsFile", fileName, Convert.ToBase64String(content));
+        }
+        else
+        {
+            // Обработка ошибок
+        }
+    }
+
+}

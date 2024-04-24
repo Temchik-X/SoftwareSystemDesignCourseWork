@@ -1,0 +1,191 @@
+﻿@page "/security"
+@using BlazorApp2.Shared
+@using Microsoft.AspNetCore.Authorization
+@inject AuthenticationService authService
+@inject NavigationManager navigationManager
+@inject HttpClient httpClient
+@attribute [Authorize]
+<style>
+
+        section {
+            padding: 20px;
+        }
+
+        #accessManagement {
+            background-color: #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        #registerUser {
+            background-color: #eee;
+            padding: 20px;
+        }
+        #accessModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            z-index: 1;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+    </style>
+@if (isAuthenticated && role == "Admin")
+{
+    <SetAccessDialog @ref="setAccessDialog"/>
+    <section>
+        <div id="accessManagement">
+            <h2>Управление доступом</h2>
+            <p>Настройте и контролируйте доступ к конфиденциальным данным.</p>
+                <button @onclick="OpenSetAccessModal">Настроить доступ</button>
+        </div>
+        <div id="registerUser">
+        <h2>Регистрация пользователей</h2>
+        <EditForm Model="@registerModel">   
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div style="margin-top:5px">
+                <label for="username">Имя пользователя:</label>
+                <InputText id="username" @bind-Value="@registerModel.Username" />
+            </div>
+            <div style="margin-top:5px">
+                <label for="password">Пароль:</label>
+                <InputText id="password" type="password" @bind-Value="@registerModel.Password" />
+            </div>
+            <div style="margin-top:5px">
+                <label for="password">Роль:</label>
+                    <select style="margin-left:5px" id="role" name="role" @bind="@registerModel.Role" required>
+                        <option value="null">Выберите...</option>
+                        <option value="User">Сотрудник</option>
+                        <option value="Admin">Администратор</option>
+                        <option value="Manager">Менеджер</option>
+                </select>
+            </div>
+            <div style="margin-top:5px">
+                <label for="employeeSelect">Выберите сотрудника:</label>
+                @if (employees != null)
+                {
+                    <select style="margin-left:5px" id="employeeSelect"@bind="@registerModel.EmployeeId" required>
+                        <option value="0">Выберите...</option>
+                        @foreach (var employee in employees)
+                        {
+                            <option value="@employee.id">@employee.name - @employee.jobtitle</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <a>Загрузка...</a>
+                }
+            </div>
+            <Button Color="ButtonColor.Secondary" Size="Size.Small" @onclick="Register">Зарегистрироваться</Button>
+        </EditForm>
+        </div>
+        
+
+    </section>
+}
+else if (!isLoad)
+{
+        <section>
+        <div class="d-flex justify-content-center">
+            <strong role="status">Загрузка...</strong>
+            <Spinner Type="SpinnerType.Border" Class="ms-auto" />
+        </div>
+        </section>
+}
+else
+{
+        <section>
+            <h2>Ошибка 403. Доступ только для авторизованных пользователей</h2>
+        @if (role == null)
+        {
+                    <h3>Возврат на страницу авторизации через: @timer</h3>
+        }
+        </section>
+}
+@code {
+    private RegisterModel registerModel = new RegisterModel();
+    private string errorMessage;
+    private List<Employee> employees;
+    private List<User> users;
+    [Inject] protected ToastService ToastService { get; set; } = default!;
+
+    private SetAccessDialog setAccessDialog;
+
+    private bool isAuthenticated;
+    private bool isLoad;
+    private string role;
+    private int timer = 15;
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await authService.IsAuthenticated();
+        if (!isAuthenticated)
+        {
+            isLoad = true;
+            for (timer = 15; timer > 0; timer--)
+            {
+                await Task.Delay(1000);
+                StateHasChanged();
+            }
+            navigationManager.NavigateTo("/");
+        }
+        else
+        {
+            role = await authService.GetRole();
+            try
+            {
+                employees = await httpClient.GetFromJsonAsync<List<Employee>>("api/Employee");
+                users = await httpClient.GetFromJsonAsync<List<User>>("api/User");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                // Или другие действия по логированию ошибки
+            }
+            isLoad = true;
+        }
+    }
+    private async Task Register()
+    {
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync("api/Authentication/register", registerModel);
+            response.EnsureSuccessStatusCode();
+            registerModel = new RegisterModel();
+            StateHasChanged();
+            OnModalSuccess();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Ошибка регистрации: " + ex.Message;
+            OnModalError(errorMessage);
+        }
+    }
+    private async Task OpenSetAccessModal()
+    {
+        setAccessDialog.users = users;
+        await setAccessDialog.modal.ShowAsync();
+    }
+    private void OnModalSuccess()
+    {
+        ToastService.Notify(new(ToastType.Success, $"Пользователь успешно добавлен: {DateTime.Now}"));
+    }
+    private void OnModalError(string error)
+    {
+        ToastService.Notify(new(ToastType.Danger, $"Ошибка {error}"));
+    }
+
+}

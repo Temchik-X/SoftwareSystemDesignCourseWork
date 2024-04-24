@@ -1,0 +1,76 @@
+﻿@using Microsoft.AspNetCore.Authorization
+@inject IAuthService aService
+@inject AuthenticationService authService
+@inject NavigationManager navigationManager
+@inject IPageTitleService PageTitleService
+
+@if (isAuthenticated)
+{
+    <header>
+        <h2>@PageName</h2>
+                <Button Color="ButtonColor.Secondary" Size="Size.Small" @onclick="() => Logout()" style="position: absolute; right: 10px; top: 5px;">Выйти</Button>
+    </header>
+    <nav>
+        <a href="/main" onclick="@(() => UpdatePage("Главная"))">Главная</a>
+        @if (role != "User")
+        {
+            <a href="/employees" onclick="@(() => UpdatePage("Учет кадров"))">Учет кадров</a>
+            <a href="/performance_evaluation" onclick="@(() => UpdatePage("Оценка эффективности"))">Оценка эффективности</a>
+        }
+        
+        <a href="/career_planning" onclick="@(() => UpdatePage("Планирование карьерного роста"))">Планирование карьерного роста</a>
+        <a href="/training_and_development" onclick="@(() => UpdatePage("Обучение и развитие"))">Обучение и развитие</a>
+        <a href="/reporting" onclick="@(() => UpdatePage("Отчетность и аналитика"))">Отчетность и аналитика</a>
+        @if (role == "Admin")
+        {
+            <a href="/security" onclick="@(() => UpdatePage("Информационная безопасность"))">Информационная безопасность</a>
+        }
+        
+    <!-- Добавьте остальные ссылки с соответствующими заголовками -->
+</nav>}
+@code {
+    private bool isAuthenticated;
+    private string PageName { get; set; }
+    private string role;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.OnPageTitleUpdated += UpdatePageTitle;
+        await UpdatePageTitle("Главная");
+    }
+    public async Task UpdatePageTitle(string pageTitle = "Главная")
+    {
+        PageName = pageTitle;
+        isAuthenticated = await authService.IsAuthenticated();
+        if (isAuthenticated)
+        {
+            role = await authService.GetRole();
+        }
+        
+        await InvokeAsync(StateHasChanged);
+    }
+    public void UpdatePage(string pageTitle)
+    {
+        PageName = pageTitle;
+        StateHasChanged();
+    }
+    public async Task DisposeAsync()
+    {
+        PageTitleService.OnPageTitleUpdated -= UpdatePageTitle;
+    }
+    private async Task Logout()
+    {
+        try
+        {
+            // Выполняем аутентификацию
+            await authService.LogoutAsync();
+            await UpdatePageTitle();
+            // Перенаправляем пользователя на защищенную страницу
+            navigationManager.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+        }
+    }
+}

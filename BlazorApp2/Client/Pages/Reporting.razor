@@ -1,0 +1,104 @@
+﻿@page "/reporting"
+@using Microsoft.AspNetCore.Authorization
+@inject AuthenticationService authService
+@inject NavigationManager navigationManager
+@inject HttpClient httpClient
+@attribute [Authorize]
+
+<style>
+        section {
+            padding: 20px;
+        }
+
+        #reportList {
+            background-color: #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        #createReportModal, #viewReportModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            z-index: 1;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+        /* Обычное состояние ссылки */
+        .editLink {
+        color: #007bff; /* Цвет текста ссылки */
+        text-decoration: none; /* Убираем подчеркивание */
+        }
+
+        /* Состояние при наведении на ссылку */
+        .editLink:hover {
+        text-decoration: underline; /* Подчеркиваем ссылку при наведении */
+        cursor: pointer; /* Изменяем курсор на указывающую руку */
+        }
+
+        /* Состояние активной ссылки (нажатие) */
+        .editLink:active {
+        color: #0056b3; /* Цвет текста при нажатии */
+        }
+    </style>
+@if (isAuthenticated)
+{
+    <CreateReportDialog @ref="createReportDialog"/>
+    <section>
+        <div id="reportList">
+            <h2>Отчеты по персоналу</h2>
+
+            <ul>
+                <li><a class="editLink" @onclick='() => viewReport("Заявление на обучение")'>Заявление на обучение</a></li>
+                <li><a class="editLink" @onclick='() => viewReport("Заявление на прием на работу")'>Заявление на прием на работу</a></li>
+                <li><a class="editLink" @onclick='() => viewReport("Заявление об изменении данных сотрудника")'>Заявление об изменении данных сотрудника</a></li>
+                <li><a class="editLink" @onclick='() => viewReport("Приказ о приеме на работу")'>Приказ о приеме на работу</a></li>
+                <li><a class="editLink" @onclick='() => viewReport("Заявка на повышение квалификации")'>Заявка на повышение квалификации</a></li>
+                <li><a class="editLink" @onclick='() => viewReport("Заявление на предоставление отпуска")'>Заявление на предоставление отпуска</a></li>
+            </ul>
+        </div>
+    </section>
+}
+else
+{
+        <section>
+                <h2>Ошибка 403. Доступ только для авторизованных пользователей</h2>
+                <h3>Возврат на страницу авторизации через: @timer</h3>
+        </section>
+}
+@code {
+    private CreateReportDialog createReportDialog;
+    private bool isAuthenticated;
+    private int timer = 15;
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await authService.IsAuthenticated();
+        if (!isAuthenticated)
+        {
+            for (timer = 15; timer > 0; timer--)
+            {
+                await Task.Delay(1000);
+                StateHasChanged();
+            }
+            navigationManager.NavigateTo("/");
+        }
+    }
+    private async Task viewReport(string name)
+    {
+        createReportDialog.nameReport = name;
+        await createReportDialog.modal.ShowAsync();
+    }
+}

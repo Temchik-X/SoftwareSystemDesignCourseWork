@@ -1,0 +1,58 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Authorization
+@inject AuthenticationService authService
+@inject NavigationManager navigationManager
+@attribute [Authorize]
+@if (isAuthenticated)
+{
+    <div style="padding: 20px;">
+        <h3>Защищенная страница</h3>
+        <p>Ваша имя пользователя: @username</p>
+        <p>Ваша роль: @userRole</p>
+        <!-- Здесь содержимое защищенной страницы -->
+        <button @onclick="Logout">Выйти</button>
+     </div>
+}
+else
+{
+        <div style="padding: 20px;">
+            <h3>Требуется авторизация для доступа к системе</h3>
+            <p><a href="/login">Авторизоваться</a></p>
+            <p>Для создания учетной записи обратитесь к администратору</p>
+        </div>
+        
+}
+
+@code {
+    private bool isAuthenticated;
+    private string userRole;
+    private string username;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await authService.IsAuthenticated();
+
+        if (isAuthenticated)
+        {
+            //navigationManager.NavigateTo("/main");
+            userRole = await authService.GetRole(); // Предполагается, что роль будет одна
+            username = await authService.GetUsername();
+        }
+    }
+
+    private async Task Logout()
+    {
+        try
+        {
+            // Выполняем аутентификацию
+            await authService.LogoutAsync();
+
+            // Перенаправляем пользователя на защищенную страницу
+            navigationManager.NavigateTo("/secure-page");
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+        }
+    }
+}

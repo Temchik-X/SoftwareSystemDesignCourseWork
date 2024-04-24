@@ -1,0 +1,51 @@
+﻿@inject HttpClient Http
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+<Modal @ref="modal" Title="Добавление процесса найма">
+    <BodyTemplate>
+       <h3>Добавить процесс найма</h3>
+       <div>
+            <label for="name">Вакансия:</label>
+            <input type="text" id="vacancy" @bind="newHiring.vacancy" />
+        </div>
+        <div>
+             <label for="jobTitle">Статус:</label>
+             <input type="text" id="status" @bind="newHiring.status" />
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Secondary" @onclick="OnHideAddHiringModal">Отмена</Button>
+        <Button Color="ButtonColor.Secondary" Outline="true" @onclick="AddHiring">Добавить</Button>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    public Modal modal = default!;
+    private HrProcess newHiring = new HrProcess();
+
+    [Parameter]
+    public Func<Task> RefreshHirings { get; set; }
+
+    private async Task AddHiring()
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/HrProcess", newHiring);
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+            newHiring = new HrProcess();
+            // Если запрос успешен, закрываем диалоговое окно
+            await OnHideAddHiringModal();
+            await RefreshHirings(); // Вызываем событие
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Ошибка при добавлении сотрудника: {ex.Message}");
+        }
+    }
+
+    private async Task OnHideAddHiringModal()
+    {
+        await modal.HideAsync();
+    }
+}

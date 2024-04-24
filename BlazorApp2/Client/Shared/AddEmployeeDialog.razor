@@ -1,0 +1,54 @@
+﻿@inject HttpClient Http
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+<Modal @ref="modal" Title="Добавление сотрудника">
+    <BodyTemplate>
+       <h3>Добавить сотрудника</h3>
+        <div>
+            <label for="name">Имя:</label>
+            <input type="text" id="name" @bind="newEmployee.name" />
+        </div>
+        <div>
+            <label for="jobTitle">Должность:</label>
+            <input type="text" id="jobTitle" @bind="newEmployee.jobtitle" />
+        </div>
+        <div>
+            <label for="competencies">Компетенции:</label>
+            <input type="text" id="competencies" @bind="newEmployee.competencies" />
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Secondary" @onclick="OnHideAddEmployeeModal">Отмена</Button>
+        <Button Color="ButtonColor.Secondary" Outline="true" @onclick="AddEmployee">Добавить</Button>
+    </FooterTemplate>
+</Modal>
+@code {
+    public Modal modal = default!;
+    private Employee newEmployee = new Employee();
+
+    [Parameter]
+    public Func<Task> RefreshEmployees { get; set; }
+
+    private async Task AddEmployee()
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/Employee", newEmployee);
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+
+            // Если запрос успешен, закрываем диалоговое окно
+            await OnHideAddEmployeeModal();
+            newEmployee = new Employee();
+            await RefreshEmployees(); // Вызываем событие
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Ошибка при добавлении сотрудника: {ex.Message}");
+        }
+    }
+    private async Task OnHideAddEmployeeModal()
+    {
+        await modal.HideAsync();
+    }
+}

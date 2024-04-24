@@ -1,0 +1,79 @@
+﻿@inject HttpClient Http
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+<Modal @ref="modal" OnShowing="OnModalShowing"  Title="Редактирование курса">
+    <BodyTemplate>
+        <h3>Редактировать курс</h3>
+        <div>
+            <label for="name">Название:</label>
+            <input type="text" id="name" @bind="editedCourse.course_name" />
+        </div>
+        <div>
+            <label for="isFinished">Статус:</label>
+            <Switch  id="isFinished" @bind-Value="editedCourse.is_finished" />
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Secondary" @onclick="OnHideEditCourseModal">Отмена</Button>
+        <Button Color="ButtonColor.Secondary" Outline="true" @onclick="UpdateCourse">Сохранить</Button>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    public Modal modal = default!;
+    private Course editedCourse = new Course();
+    private bool isLoaded = false;
+
+    [Parameter]
+    public Course course { get; set; }
+
+    [Parameter]
+    public Func<Task> RefreshCourses { get; set; }
+    private void OnModalShowing()
+    {
+        Console.WriteLine($"Установка параметров изменения {course.is_finished}");
+        try
+        {
+            if (course != null && !isLoaded)
+            {
+
+                editedCourse = new Course
+                    {
+                        id = course.id,
+                        course_name = course.course_name,
+                        user_id = course.user_id,
+                        is_finished = course.is_finished
+                    };
+                isLoaded = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Ошибка при обновлении сотрудника: {ex.Message}");
+        }
+    }
+    private async Task UpdateCourse()
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/Course/{editedCourse.id}", editedCourse);
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+            StateHasChanged();
+            // Если запрос успешен, закрываем диалоговое окно
+            await OnHideEditCourseModal();
+            await RefreshCourses(); // Вызываем метод обновления данных
+            
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Ошибка при обновлении сотрудника: {ex.Message}");
+        }
+    }
+    private async Task OnHideEditCourseModal()
+    {
+        isLoaded = false;
+        await modal.HideAsync();
+    }
+}

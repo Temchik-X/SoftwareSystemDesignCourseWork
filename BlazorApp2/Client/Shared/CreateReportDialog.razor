@@ -1,0 +1,76 @@
+﻿@inject HttpClient Http
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+@using Microsoft.JSInterop
+@inject HttpClient httpClient
+<Modal @ref="modal" Title="Создание отчета">
+    <BodyTemplate>
+        <div>
+            <label for="name">Cодержание отчета:</label>
+            <label type="text" id="name">@nameReport</label>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Secondary" @onclick="(OnHideReportModal)">Отмена</Button>
+        <Button Color="ButtonColor.Secondary" Outline="true" @onclick="(CreateReport)" >Создать</Button>
+    </FooterTemplate>
+</Modal>
+@code {
+    public Modal modal = default!;
+    [Inject] protected ToastService ToastService { get; set; } = default!;
+    [Parameter]
+    public string nameReport { get; set; }
+    private async Task CreateReport()
+    {
+        string filename;
+        switch (nameReport)
+        {
+            case "Заявление на обучение":
+                filename = "Zayavlenie_na_obychenie.docx"; 
+                break;
+            case "Заявление на прием на работу":
+                filename = "Zayavlenie_o_prieme_na_raboty.docx";
+                break;
+            case "Заявление об изменении данных сотрудника":
+                filename = "Zayavlenie_o_smene_dannyh.docx";
+                break;
+            case "Приказ о приеме на работу":
+                filename = "Prikaz_o_prieme_na_rabotu.docx";
+                break;
+            case "Заявка на повышение квалификации":
+                filename = "Zayavlenie_na_povishenie_kval.docx";
+                break;
+            case "Заявление на предоставление отпуска":
+                filename = "Zayavlenie_na_otpusk.docx";
+                break;
+            default:
+                filename = null;
+                ToastService.Notify(new(ToastType.Danger, $"Ошибка при создании отчета!"));
+                await OnHideReportModal();
+                break;
+        }
+        if (filename != null)
+            await DownloadFile(filename);
+        await OnHideReportModal();
+    }
+    [Inject]
+    protected IJSRuntime JSRuntime { get; set; }
+    private async Task DownloadFile(string fileName)
+    {
+        var response = await httpClient.GetAsync($"api/Documents/{fileName}");
+
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsByteArrayAsync();
+            await JSRuntime.InvokeVoidAsync("saveAsFile", fileName, Convert.ToBase64String(content));
+        }
+        else
+        {
+            // Обработка ошибок
+        }
+    }
+    private async Task OnHideReportModal()
+    {
+        await modal.HideAsync();
+    }
+}

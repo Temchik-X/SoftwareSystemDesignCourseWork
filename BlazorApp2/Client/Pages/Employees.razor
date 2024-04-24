@@ -1,0 +1,244 @@
+﻿@page "/employees"
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+@using Microsoft.AspNetCore.Authorization
+@inject AuthenticationService authService
+@inject NavigationManager navigationManager
+@inject HttpClient Http
+@attribute [Authorize]
+<style>
+
+        section {
+        padding: 20px;
+        }
+
+        #employees {
+        background-color: #ddd;
+        padding: 20px;
+        margin-bottom: 20px;
+        }
+
+        #hiring {
+        background-color: #eee;
+        padding: 20px;
+        }
+        li {
+        margin-bottom: 5px;
+        margin-top: 5px;
+        }
+
+        li span {
+        margin-right: 5px;
+        }
+        .overlay {
+        display: none;
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        top: 0;
+        left: 0;
+        z-index: 0;
+        }
+        /* Обычное состояние ссылки */
+        .editLink {
+        color: #007bff; /* Цвет текста ссылки */
+        text-decoration: none; /* Убираем подчеркивание */
+        }
+
+        /* Состояние при наведении на ссылку */
+        .editLink:hover {
+        text-decoration: underline; /* Подчеркиваем ссылку при наведении */
+        cursor: pointer; /* Изменяем курсор на указывающую руку */
+        }
+
+        /* Состояние активной ссылки (нажатие) */
+        .editLink:active {
+        color: #0056b3; /* Цвет текста при нажатии */
+        }
+    </style>
+@if (isAuthenticated && role != "User")
+{
+    <AddEmployeeDialog @ref="addEmployeeDialog"  RefreshEmployees="RefreshEmployees"/>
+    <AddHiringDialog @ref="addHiringDialog"  RefreshHirings="RefreshHirings"/>
+    <EditEmployeeDialog @ref="editEmployeeDialog"  RefreshEmployees="RefreshEmployees"/>
+    
+    <section>
+        <div id="employees">
+            <h2>Сотрудники</h2>
+            @if (employees != null)
+            {
+                <Button Color="ButtonColor.Secondary" Size="Size.Small" @onclick="ShowAddEmployeeDialog">Добавить сотрудника</Button>
+                <ul>
+                    @foreach (var employee in employees)
+                    {
+                        <li><span class="editLink" @onclick="() => ShowEditEmployeeDialog(employee)">@employee.name - @employee.jobtitle</span>
+                            <Button Color="ButtonColor.Secondary" Size="Size.Small" @onclick="() => DeleteEmployee(employee.id)">Удалить</Button></li>
+                        <!-- <li><a class="editLink" @onclick="() => ShowEditEmployeeDialog(employee)">@employee.name - @employee.jobtitle</a>
+                        <Button Color="ButtonColor.Secondary" Size="Size.Small"n @onclick="() => ShowEditEmployeeDialog(employee)">Редактировать</Button>
+                        <Button Color="ButtonColor.Secondary" Size="Size.Small" @onclick="() => DeleteEmployee(employee.id)">Удалить</Button></li>-->
+                    }
+                </ul>
+            }
+            else
+            {
+                <p>Загрузка...</p>
+            }
+        </div>
+        <div id="hiring">
+            <h2>Найм новых сотрудников</h2>
+            @if (hrProcesses != null)
+            {
+                <Button Color="ButtonColor.Secondary" Size="Size.Small" @onclick="ShowAddHiringDialog">Добавить процесс найма</Button>
+                <ul>
+                    @foreach (var hiringProcess in hrProcesses)
+                    {
+                        <li>@hiringProcess.vacancy <Button Color="ButtonColor.Secondary" Size="Size.Small" @onclick="() => DeleteHrProcess(hiringProcess.id)">Удалить</Button></li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p>Загрузка...</p>
+            }
+        </div>
+    </section>
+}
+else if (!isLoad)
+{
+    <section>
+    <div class="d-flex justify-content-center">
+        <strong role="status">Загрузка...</strong>
+        <Spinner Type="SpinnerType.Border" Class="ms-auto" />
+    </div>
+    </section>
+}
+else
+{
+    <section>
+        <h2>Ошибка 403. Доступ только для авторизованных пользователей</h2>
+        @if (role == null)
+        {
+            <h3>Возврат на страницу авторизации через: @timer</h3>
+        }
+    </section>
+}
+@code {
+    private bool isAuthenticated;
+    private bool isLoad = false;
+    private string role;
+    private List<Employee> employees;
+    private List<HrProcess> hrProcesses;
+    private int timer = 15;
+
+    private AddEmployeeDialog addEmployeeDialog;
+    private AddHiringDialog addHiringDialog;
+    private EditEmployeeDialog editEmployeeDialog;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await authService.IsAuthenticated(); 
+        if (!isAuthenticated)
+        {
+            isLoad = true;
+            for(timer = 15; timer > 0; timer--)
+            {
+                await Task.Delay(1000);
+                StateHasChanged();
+            }
+            navigationManager.NavigateTo("/");
+        }
+        else
+        {
+            role = await authService.GetRole();
+            try
+            {
+                employees = await Http.GetFromJsonAsync<List<Employee>>("api/Employee");
+                hrProcesses = await Http.GetFromJsonAsync<List<HrProcess>>("api/HrProcess");
+                isLoad = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                // Или другие действия по логированию ошибки
+            }
+        }
+
+        
+    }
+
+    private async Task ShowAddEmployeeDialog()
+    {
+        await addEmployeeDialog.modal.ShowAsync();
+    }
+
+    private async Task ShowAddHiringDialog()
+    {
+        await addHiringDialog.modal.ShowAsync();
+    }
+
+    private async Task RefreshEmployees()
+    {
+        try
+        {
+            employees = await Http.GetFromJsonAsync<List<Employee>>("api/Employee");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+            // Или другие действия по логированию ошибки
+        }
+    }
+
+    private async Task RefreshHirings()
+    {
+        try
+        {
+            hrProcesses = await Http.GetFromJsonAsync<List<HrProcess>>("api/HrProcess");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+            // Или другие действия по логированию ошибки
+        }
+    }
+
+    private async Task ShowEditEmployeeDialog(Employee employee)
+    {
+        editEmployeeDialog.Employee = employee;
+        await editEmployeeDialog.modal.ShowAsync();
+    }
+
+    private async Task DeleteEmployee(int id)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/Employee/{id}");
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+
+            await RefreshEmployees(); // Вызываем метод обновления данных
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+    private async Task DeleteHrProcess(int id)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/HrProcess/{id}");
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+
+            await RefreshHirings(); // Вызываем метод обновления данных
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}

@@ -1,0 +1,53 @@
+﻿@inject HttpClient Http
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+
+    <Modal @ref="modal" Title="Добавление цели">
+    <BodyTemplate>
+       <h3>Добавить цель</h3>
+       <div>
+                    <label for="course_name">Название:</label>
+                    <textarea type="text" id="course_name" @bind="newIndividualGoal.course_name" />
+                </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Secondary" @onclick="OnHideAddGoalModal">Отмена</Button>
+        <Button Color="ButtonColor.Secondary" Outline="true" @onclick="AddGoal">Добавить</Button>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    public Modal modal = default!;
+    private IndividualGoal newIndividualGoal = new IndividualGoal();
+    [Parameter]
+    public int EmployeeId { get; set; }
+    [Parameter]
+    public Func<Task> RefreshGoals { get; set; }
+
+    private async Task AddGoal()
+    {
+        if (EmployeeId == 0)
+            return;
+        try
+        {
+            newIndividualGoal.employee_id = EmployeeId;
+            var response = await Http.PostAsJsonAsync("api/IndividualGoal", newIndividualGoal);
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+            EmployeeId = 0;
+            newIndividualGoal = new IndividualGoal();
+            // Если запрос успешен, закрываем диалоговое окно
+            await OnHideAddGoalModal();
+            await RefreshGoals(); // Вызываем событие
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    private async Task OnHideAddGoalModal()
+    {
+        await modal.HideAsync();
+    }
+}

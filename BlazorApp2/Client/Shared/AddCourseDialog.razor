@@ -1,0 +1,51 @@
+﻿@inject HttpClient Http
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+<Modal @ref="modal" Title="Добавление курса">
+    <BodyTemplate>
+        <h3>Добавить курс</h3>
+        <div>
+            <label for="name">Название:</label>
+            <textarea type="text" id="name" @bind="newCourse.course_name" />
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Secondary" @onclick="OnHideAddCourseModal">Отмена</Button>
+        <Button Color="ButtonColor.Secondary" Outline="true" @onclick="AddCourse">Добавить</Button>
+    </FooterTemplate>
+</Modal>
+@code {
+    public Modal modal = default!;
+    private Course newCourse = new Course();
+    [Parameter]
+    public Func<Task> RefreshCourses { get; set; }
+    [Parameter]
+    public int userId { get; set; }
+
+    private async Task AddCourse()
+    {
+        try
+        {
+            if(userId != 0)
+            {
+                newCourse.user_id = userId;
+                var response = await Http.PostAsJsonAsync("api/Course", newCourse);
+                response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+                                                    // Если запрос успешен, закрываем диалоговое окно
+                await OnHideAddCourseModal();
+                newCourse = new Course();
+                await RefreshCourses(); // Вызываем событие
+            }
+            
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+    private async Task OnHideAddCourseModal()
+    {
+        await modal.HideAsync();
+    }
+}

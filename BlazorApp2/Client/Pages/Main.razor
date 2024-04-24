@@ -1,0 +1,142 @@
+﻿@page "/main"
+@using Microsoft.AspNetCore.Authorization
+@inject AuthenticationService authService
+@inject NavigationManager navigationManager
+@inject HttpClient Http
+@attribute [Authorize]
+<style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 10px;
+            text-align: center;
+            position: relative;
+        }
+
+        #but {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 8px 16px;
+            background-color: #565656;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+
+        /* Опциональный стиль для подсветки при наведении на кнопку */
+        button:hover {
+            background-color: #555;
+        }
+
+        nav {
+            background-color: #444;
+            padding: 10px;
+        }
+
+        nav a {
+            color: #fff;
+            text-decoration: none;
+            padding: 8px 16px;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        section {
+            padding: 20px;
+        }
+
+        #welcome {
+            background-color: #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        #calendar {
+            background-color: #eee;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        #notifications {
+            background-color: #ccc;
+            padding: 10px;
+        }
+
+        #status {
+            background-color: #ffb347;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #fff;
+    padding: 20px;
+    z-index: 1;
+}
+
+.modal input {
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+    </style>
+@if (isAuthenticated)
+{
+    <section>
+        <div id="welcome">
+            <h2>Приветствие и обзор</h2>
+            <p>Добро пожаловать в систему управления персоналом. Здесь вы можете эффективно управлять кадровыми ресурсами компании.</p>
+            <h3>Обзор текущего статуса</h3>
+            <p>Текущий статус ключевых показателей: <strong>всего сотрудников - 150, открытых вакансий - 5, завершенных курсов обучения - 30</strong>.</p>
+        </div>
+        <div id="calendar">
+            <h2>Календарь и уведомления</h2>
+            <p>Ближайшие события:
+                <ul>
+                    <li>Обучение новых сотрудников - 10 января</li>
+                    <li>Ежеквартальная оценка производительности - 15 января</li>
+                </ul>
+            </p>
+        </div>
+        <div id="notifications">
+            <h2>Системные уведомления</h2>
+            <p>Важное уведомление: <a >До конца месяца необходимо провести оценку производительности сотрудников.</a></p>
+        </div>
+    </section>
+}
+else
+{
+        <section>
+                <h2>Ошибка 403. Доступ только для авторизованных пользователей</h2>
+                <h3>Возврат на страницу авторизации через: @timer</h3>
+        </section>
+}
+@code {
+    private bool isAuthenticated;
+    private int timer = 15;
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await authService.IsAuthenticated();
+        if (!isAuthenticated)
+        {
+            for (timer = 15; timer > 0; timer--)
+            {
+                await Task.Delay(1000);
+                StateHasChanged();
+            }
+            navigationManager.NavigateTo("/");
+        }
+    }
+}

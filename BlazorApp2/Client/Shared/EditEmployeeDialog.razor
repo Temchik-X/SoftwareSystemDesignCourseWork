@@ -1,0 +1,86 @@
+﻿@inject HttpClient Http
+@using BlazorApp2.Shared;
+@using BlazorBootstrap;
+<Modal @ref="modal" OnShowing="OnModalShowing" OnHiding="OnModalHiding" Title="Редактирование сотрудника">
+    <BodyTemplate>
+        <h3>Редактировать сотрудника</h3>
+        <div>
+            <label for="name">Имя:</label>
+            <input type="text" id="name" @bind="editedEmployee.name" />
+        </div>
+        <div>
+            <label for="jobTitle">Должность:</label>
+            <input type="text" id="jobTitle" @bind="editedEmployee.jobtitle" />
+        </div>
+        <div>
+            <label for="competencies">Компетенции:</label>
+            <input type="text" id="competencies" @bind="editedEmployee.competencies" />
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Secondary" @onclick="OnHideEditEmployeeModal">Отмена</Button>
+        <Button Color="ButtonColor.Secondary" Outline="true" @onclick="UpdateEmployee">Сохранить</Button>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    public Modal modal = default!;
+    private Employee editedEmployee = new Employee();
+    private bool isLoaded = false;
+
+    [Parameter]
+    public Employee Employee { get; set; }
+
+    [Parameter]
+    public Func<Task> RefreshEmployees { get; set; }
+
+    private async Task UpdateEmployee()
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/Employee/{editedEmployee.id}", editedEmployee);
+            response.EnsureSuccessStatusCode(); // Проверяем успешность запроса
+
+            // Если запрос успешен, закрываем диалоговое окно
+            await OnHideEditEmployeeModal();
+            await RefreshEmployees(); // Вызываем метод обновления данных
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Ошибка при обновлении сотрудника: {ex.Message}");
+        }
+    }
+    private void OnModalHiding()
+    {
+    }
+    private void OnModalShowing()
+    {
+        Console.WriteLine("Установка параметров изменения");
+        try
+        {
+            if (Employee != null && !isLoaded)
+            {
+
+                editedEmployee = new Employee
+                    {
+                        id = Employee.id,
+                        name = Employee.name,
+                        jobtitle = Employee.jobtitle,
+                        competencies = Employee.competencies
+                    };
+                isLoaded = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибок
+            Console.WriteLine($"Ошибка при обновлении сотрудника: {ex.Message}");
+        }
+    }
+    private async Task OnHideEditEmployeeModal()
+    {
+        isLoaded = false;
+        await modal.HideAsync();
+    }
+}
